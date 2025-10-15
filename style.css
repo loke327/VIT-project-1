@@ -1,0 +1,118 @@
+/* style.css - common styles for all pages */
+:root{
+  --primary:#006064;
+  --primary-dark:#004d40;
+  --bg1: linear-gradient(135deg,#e0f7fa,#80deea);
+  --card-bg: #ffffff;
+}
+
+*{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, "Helvetica Neue", Arial;}
+
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--bg1);
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:28px;
+}
+
+/* container */
+.app {
+  width:100%;
+  max-width:920px;
+  background:var(--card-bg);
+  border-radius:12px;
+  box-shadow:0 8px 30px rgba(0,0,0,0.12);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  min-height:640px;
+}
+
+/* header */
+.app .header{
+  background:var(--primary);
+  color:#fff;
+  padding:18px 20px;
+  font-size:20px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+/* content zone */
+.app .content {
+  padding:20px;
+  flex:1;
+  overflow-y:auto;
+}
+
+/* step card */
+.card{
+  background:#f7fbfb;
+  border-radius:10px;
+  padding:16px;
+  margin-bottom:14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+/* small inputs and buttons */
+.input, textarea, select{
+  width:100%;
+  padding:10px 12px;
+  margin:8px 0;
+  border-radius:8px;
+  border:1px solid #d7eaea;
+  background:white;
+  font-size:14px;
+}
+
+.btn{
+  display:inline-block;
+  padding:10px 14px;
+  border-radius:9px;
+  border:none;
+  background:var(--primary);
+  color:white;
+  cursor:pointer;
+  font-weight:600;
+  margin-right:8px;
+}
+
+.btn.ghost{
+  background:transparent;
+  color:var(--primary);
+  border:1px solid var(--primary);
+}
+
+.row{
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+
+.doctor-btn{
+  display:block;
+  padding:10px;
+  border-radius:9px;
+  border:1px solid #cde7e7;
+  background:white;
+  cursor:pointer;
+  margin:6px 0;
+  text-align:left;
+}
+
+/* success & info */
+.info { color:var(--primary-dark); font-weight:600; }
+.success { color:green; font-weight:700; }
+
+/* small help text */
+.help { font-size:13px; color:#666; margin-top:6px; }
+
+/* mobile responsiveness */
+@media (max-width:600px){
+  .app{ margin:12px; }
+  .row{ flex-direction:column; align-items:stretch; }
+}

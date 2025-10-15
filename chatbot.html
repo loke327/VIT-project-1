@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Medical Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app" role="application">
+    <div class="header">
+      <div style="font-weight:700">AI Medical Assistant</div>
+      <div style="margin-left:auto; font-size:13px; opacity:0.9">Demo</div>
+    </div>
+    <div class="content">
+      <div id="welcome" class="card">
+        <div style="font-size:18px; font-weight:700">Welcome 👋</div>
+        <div class="help">Select an option to begin.</div>
+        <div style="margin-top:12px;">
+          <button class="btn" onclick="startAppointment()">🗓️ General Appointment Booking</button>
+          <button class="btn" onclick="startPrescription()">🧾 Medical Prescription</button>
+        </div>
+      </div>
+      <div id="flow" class="card" style="display:none;"></div>
+      <div id="result" class="card" style="display:none;"></div>
+    </div>
+  </div>
+
+<script>
+/* ---------- state & helpers ---------- */
+let STATE = { pincode: null, diagnosis: null, selectedDoctorId: null, appointmentType: null, appointment_id: null, amount: null };
+
+function showFlow(html) { const el = document.getElementById('flow'); el.style.display='block'; el.innerHTML = html; }
+function showResult(html) { const el = document.getElementById('result'); el.style.display='block'; el.innerHTML = html; }
+function resetFlow(){ document.getElementById('flow').style.display='none'; document.getElementById('result').style.display='none'; STATE = { pincode:null, diagnosis:null, selectedDoctorId:null, appointmentType:null, appointment_id:null, amount:null }; }
+
+/* ---------- Appointment flow (unchanged) ---------- */
+function startAppointment(){
+  showFlow(`
+    <div style="font-weight:700">Step 1 — Enter Pincode</div>
+    <div class="help">We will verify doctor availability in your area.</div>
+    <input id="pincode" class="input" placeholder="Enter pincode (e.g. 560001)">
+    <div style="margin-top:8px;">
+      <button class="btn" onclick="verifyPincode()">Verify</button>
+      <button class="btn ghost" onclick="resetFlow()">Cancel</button>
+    </div>
+    <div id="pincodeMsg" class="help"></div>
+  `);
+}
+async function verifyPincode(){
+  const pin = document.getElementById('pincode').value.trim();
+  const msg = document.getElementById('pincodeMsg'); msg.textContent='';
+  if(!pin){ msg.textContent='Enter a pincode.'; return; }
+  try{
+    const res = await fetch(`/api/pincode/${pin}`);
+    const j = await res.json();
+    if(!res.ok){ msg.textContent = j.message || 'Pincode not found'; return; }
+    msg.textContent = '✅ pincode verified successful — ' + (j.region || '');
+    STATE.pincode = pin;
+    setTimeout(()=> askSymptoms(), 700);
+  }catch(e){ msg.textContent='Error verifying pincode.'; }
+}
+function askSymptoms(){
+  showFlow(`
+    <div style="font-weight:700">Step 2 — Describe your symptoms</div>
+    <textarea id="symptoms" rows="4" class="input" placeholder="Describe your symptoms"></textarea>
+    <div style="margin-top:8px;">
+      <button class="btn" onclick="submitSymptoms()">Submit Symptoms</button>
+      <button class="btn ghost" onclick="resetFlow()">Cancel</button>
+    </div>
+    <div id="symMsg" class="help"></div>
+  `);
+}
+async function submitSymptoms(){
+  const text = document.getElementById('symptoms').value.trim();
+  const symMsg = document.getElementById('symMsg'); symMsg.textContent='';
+  if(!text){ symMsg.textContent='Please enter symptoms.'; return; }
+  try{
+    const fd=new FormData(); fd.append('pincode', STATE.pincode); fd.append('symptoms', text);
+    const res = await fetch('/api/diagnose', { method:'POST', body: fd });
+    const j = await res.json();
+    if(!res.ok){ symMsg.textContent = j.message || 'Diagnosis failed'; return; }
+    STATE.diagnosis = j.diagnosis;
+    const docs = j.doctors || [];
+    let html = `<div style="font-weight:700">Diagnosis: ${STATE.diagnosis}</div><div class="help">Select a doctor from the list below.</div>`;
+    if(docs.length===0){
+      html += `<div class="help" style="margin-top:10px">No doctors found for this specialty in your area.</div><div style="margin-top:12px;"><button class="btn ghost" onclick="resetFlow()">Back</button></div>`;
+    } else {
+      docs.forEach(d => html += `<button class="doctor-btn" onclick="selectDoctor('${d.id}','${d.name}','${d.specialty}')">${d.name} — ${d.specialty}</button>`);
+      html += `<div style="margin-top:12px;"><button class="btn ghost" onclick="resetFlow()">Cancel</button></div>`;
+    }
+    showFlow(html);
+  }catch(e){ symMsg.textContent='Error contacting server.'; }
+}
+function selectDoctor(id, name, specialty){
+  STATE.selectedDoctorId = id;
+  showFlow(`
+    <div style="font-weight:700">Book with ${name} (${specialty})</div>
+    <div class="help">Choose appointment type and fill patient details.</div>
+    <label style="display:block; margin-top:8px">Appointment Type</label>
+    <select id="apptType" class="input"><option value="physical">Physical Appointment</option><option value="virtual">Virtual Appointment</option></select>
+    <input id="patient_name" class="input" placeholder="Name">
+    <input id="patient_id" class="input" placeholder="Patient ID">
+    <div class="row">
+      <input id="age" class="input" placeholder="Age" type="number">
+      <select id="gender" class="input" style="max-width:140px;">
+        <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+      </select>
+    </div>
+    <input id="phone" class="input" placeholder="Phone number">
+    <input id="patient_email" class="input" placeholder="Email (optional, for receipt)">
+    <label style="display:block; margin-top:6px">Choose Date & Time</label>
+    <div class="row">
+      <input id="date" class="input" type="date">
+      <input id="time" class="input" type="time">
+    </div>
+    <div style="margin-top:8px;">
+      <button class="btn" onclick="createAppointment()">Create Appointment</button>
+      <button class="btn ghost" onclick="resetFlow()">Cancel</button>
+    </div>
+    <div id="createMsg" class="help"></div>
+  `);
+}
+async function createAppointment(){
+  const createMsg = document.getElementById('createMsg'); createMsg.textContent='';
+  const fd=new FormData();
+  fd.append('doctor_id', STATE.selectedDoctorId);
+  fd.append('appointment_type', document.getElementById('apptType').value);
+  fd.append('patient_name', document.getElementById('patient_name').value.trim());
+  fd.append('patient_id', document.getElementById('patient_id').value.trim());
+  fd.append('age', document.getElementById('age').value);
+  fd.append('gender', document.getElementById('gender').value);
+  fd.append('phone', document.getElementById('phone').value.trim());
+  fd.append('date', document.getElementById('date').value);
+  fd.append('time', document.getElementById('time').value);
+  fd.append('patient_email', document.getElementById('patient_email').value.trim());
+  try{
+    const res = await fetch('/api/choose-doctor', { method:'POST', body: fd });
+    const j = await res.json();
+    if(!res.ok){ createMsg.textContent = j.message || j.detail || 'Failed to create appointment'; return; }
+    STATE.appointment_id = j.appointment_id; STATE.amount = j.amount;
+    showFlow(`<div class="success">✅ Appointment Created</div><div>Amount: ₹${j.amount}</div><button class="btn" onclick="payNow()">Pay Now</button><button class="btn ghost" onclick="resetFlow()">Cancel</button><div id="payMsg" class="help"></div>`);
+  }catch(e){ createMsg.textContent='Error creating appointment.'; }
+}
+async function payNow(){
+  const payMsg = document.getElementById('payMsg'); if(payMsg) payMsg.textContent='';
+  const fd=new FormData(); fd.append('appointment_id', STATE.appointment_id); fd.append('amount', STATE.amount);
+  try{
+    const res = await fetch('/api/pay', { method:'POST', body: fd });
+    const j = await res.json();
+    if(!res.ok){ if(payMsg) payMsg.textContent = j.message || j.detail || 'Payment failed'; return; }
+    showResult(`<div class="success">💳 Payment Successful!</div><div class="help">Appointment ID: ${STATE.appointment_id}</div><div class="help">Confirmation email sent (if email provided).</div><button class="btn" onclick="resetFlow()">Done</button>`);
+  }catch(e){ if(payMsg) payMsg.textContent='Error processing payment.'; }
+}
+
+/* ---------- Prescription flow (new) ---------- */
+function startPrescription(){
+  showFlow(`
+    <div style="font-weight:700">Medical Prescription</div>
+    <div class="help">Provide patient details and symptoms. Medical history file is optional.</div>
+    <input id="p_name" class="input" placeholder="Name">
+    <input id="p_age" class="input" type="number" placeholder="Age">
+    <select id="p_sex" class="input"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
+    <input id="p_blood" class="input" placeholder="Blood Group">
+    <input id="p_phone" class="input" placeholder="Email (for receipt)">
+    <label>Medical history (optional)</label>
+    <input id="p_file" type="file" class="input">
+    <textarea id="p_symptoms" class="input" rows="4" placeholder="Describe symptoms"></textarea>
+    <div style="margin-top:8px;">
+      <button class="btn" onclick="startPrescriptionStep()">Analyze</button>
+      <button class="btn ghost" onclick="resetFlow()">Cancel</button>
+    </div>
+    <div id="presMsg" class="help"></div>
+  `);
+}
+
+async function startPrescriptionStep(){
+  const msg = document.getElementById('presMsg'); msg.textContent='Processing...';
+  const name = document.getElementById('p_name').value.trim();
+  const age = Number(document.getElementById('p_age').value);
+  const sex = document.getElementById('p_sex').value;
+  const blood_group = document.getElementById('p_blood').value.trim();
+  const patient_email = document.getElementById('p_phone').value.trim();
+  const symptoms = document.getElementById('p_symptoms').value.trim();
+  const file = document.getElementById('p_file').files[0];
+  if(!name || !age || !sex || !symptoms){ msg.textContent='Fill name, age, sex and symptoms.'; return; }
+  const fd = new FormData(); fd.append('name', name); fd.append('age', age); fd.append('sex', sex); fd.append('blood_group', blood_group); fd.append('symptoms', symptoms); if(file) fd.append('medical_file', file);
+  try{
+    const res = await fetch('/api/prescription/start', { method:'POST', body: fd });
+    const j = await res.json();
+    if(!res.ok){ msg.textContent = j.detail || 'Error analyzing symptoms'; return; }
+    msg.textContent='';
+    showFlow(`<div style="font-weight:700">Analysis</div><div><b>What is it:</b> ${j.what_is_it || '—'}</div><div style="margin-top:6px;"><b>How it occurs:</b> ${j.how_it_occurs || '—'}</div><div class="help" style="margin-top:12px;">If you'd like, I can suggest drugs for these symptoms.</div><div style="margin-top:8px;"><button class="btn" onclick="askGenerateDrugs('${escape(name)}', ${age}, '${sex}', '${escape(blood_group)}', '${escape(symptoms)}', '${escape(patient_email)}')">Yes, generate drugs</button><button class="btn ghost" onclick="resetFlow()">No, thanks</button></div>`);
+  }catch(e){ msg.textContent='Server error while analyzing.'; }
+}
+
+function askGenerateDrugs(name, age, sex, blood_group, symptoms, patient_email){
+  showFlow(`<div style="font-weight:700">Additional Symptoms</div><div class="help">Enter any additional symptoms (optional).</div><textarea id="p_additional" class="input" rows="3" placeholder="Additional symptoms (optional)"></textarea><div style="margin-top:8px;"><button class="btn" onclick="generateDrugs('${escape(name)}', ${age}, '${sex}', '${escape(blood_group)}', '${escape(symptoms)}', '${escape(patient_email)}')">Proceed</button><button class="btn ghost" onclick="resetFlow()">Cancel</button></div><div id="genMsg" class="help"></div>`);
+}
+
+async function generateDrugs(name, age, sex, blood_group, symptoms, patient_email){
+  const add = document.getElementById('p_additional').value.trim();
+  const genMsg = document.getElementById('genMsg'); genMsg.textContent='Calculating risk...';
+  const fd = new FormData(); fd.append('name', unescape(name)); fd.append('age', age); fd.append('sex', sex); fd.append('blood_group', unescape(blood_group)); fd.append('symptoms', unescape(symptoms)); fd.append('additional_symptoms', add); if(patient_email) fd.append('patient_email', unescape(patient_email));
+  try{
+    const res = await fetch('/api/prescription/generate', { method:'POST', body: FormData });
+    const j = await res.json();
+    if(!res.ok){ genMsg.textContent = j.detail || 'Error generating'; return; }
+    if(j.action === 'high_risk'){
+      showFlow(`<div style="font-weight:700">High risk detected (score: ${j.risk_score.toFixed(1)})</div><div class="help">Provide location and phone to dispatch ambulance.</div><input id="amb_location" class="input" placeholder="Location (address)"><input id="amb_phone" class="input" placeholder="Phone"><button class="btn" onclick="bookAmb('${j.appointment_id}')">Book Ambulance</button>`);
+    } else if(j.action === 'prescription_generated'){
+      showResult(`<div class="success">✅ Prescription generated (score: ${j.risk_score.toFixed(1)})</div><div class="help">Prescription ID: ${j.prescription.prescription_id || j.prescription_id || '—'}</div><pre style="white-space:pre-wrap; max-height:300px; overflow:auto;">${JSON.stringify(j.prescription, null, 2)}</pre><div style="margin-top:12px;"><button class="btn" onclick="resetFlow()">Done</button></div>`);
+    } else {
+      genMsg.textContent = 'Unexpected response.';
+    }
+  }catch(e){ genMsg.textContent='Error contacting server.'; }
+}
+
+async function bookAmb(appointment_id){
+  const loc = document.getElementById('amb_location').value.trim();
+  const phone = document.getElementById('amb_phone').value.trim();
+  if(!loc || !phone){ alert('Provide both location and phone'); return; }
+  const fd=new FormData(); fd.append('appointment_id', appointment_id); fd.append('location', loc); fd.append('phone', phone); fd.append('patient_email', document.getElementById('p_phone') ? document.getElementById('p_phone').value : '');
+  const res = await fetch('/api/book-ambulance', { method:'POST', body: fd });
+  const j = await res.json();
+  if(!res.ok){ alert('Booking failed'); return; }
+  showResult(`<div class="success">Ambulance booked ✅</div><div class="help">Appointment ID: ${appointment_id}</div>`);
+}
+</script>
+</body>
+</html>

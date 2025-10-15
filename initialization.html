@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Initializing — Doctor Portal</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body{ display:flex; align-items:center; justify-content:center; height:100vh; background:linear-gradient(135deg,#e0f7fa,#80deea); margin:0;}
+    .wrap{ text-align:center; }
+    .docimg{ width:160px; height:160px; border-radius:50%; object-fit:cover; box-shadow:0 8px 30px rgba(0,0,0,0.12);}
+    .loader{ margin:18px auto; width:48px; height:48px; border-radius:50%; border:5px solid #e6f7f7; border-top:5px solid #006064; animation:spin 1s linear infinite;}
+    @keyframes spin{100%{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="docimg" src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png" alt="doctor">
+    <h2 style="color:#004d40">Initializing system...</h2>
+    <div class="loader"></div>
+  </div>
+
+  <script>
+    // after 2.5s go to login page served by backend
+    setTimeout(()=> window.location.href = "/static/login.html", 2500);
+  </script>
+</body>
+</html>

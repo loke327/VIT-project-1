@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login — Doctor Portal</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body{ display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:linear-gradient(135deg,#b2ebf2,#4dd0e1); }
+    .box{ width:380px; background:white; padding:22px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.12);}
+    .row{ margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2 style="color:#006064;margin:0 0 8px 0;">Login</h2>
+    <div class="help">Enter your email and get an OTP (simulated).</div>
+
+    <input id="email" class="input" placeholder="Email address" type="email">
+    <div class="row">
+      <button id="sendOtp" class="btn">Send OTP</button>
+    </div>
+
+    <input id="otp" class="input" placeholder="Enter OTP">
+    <div style="margin-top:10px;">
+      <button class="btn" id="verifyBtn">Verify & Login</button>
+      <a href="/static/chatbot.html" style="margin-left:10px; color:#006064; font-weight:600;">Skip (demo)</a>
+    </div>
+
+    <div id="msg" class="help"></div>
+  </div>
+
+  <script>
+    const sendOtpBtn = document.getElementById('sendOtp');
+    const verifyBtn = document.getElementById('verifyBtn');
+    const msg = document.getElementById('msg');
+
+    sendOtpBtn.addEventListener('click', async ()=>{
+      msg.textContent = "";
+      const email = document.getElementById('email').value.trim();
+      if(!email){ msg.textContent = "Enter an email first."; return; }
+      try{
+        const res = await fetch('/send-otp', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({ email })
+        });
+        const data = await res.json();
+        msg.textContent = data.message || "OTP sent (simulated). Check server console.";
+      }catch(e){
+        msg.textContent = "Error sending OTP. Make sure backend is running.";
+      }
+    });
+
+    verifyBtn.addEventListener('click', async ()=>{
+      const email = document.getElementById('email').value.trim();
+      const otp = document.getElementById('otp').value.trim();
+      if(!email || !otp){ msg.textContent = "Enter both email and OTP."; return; }
+      try{
+        // verify via /verify-otp (returns redirect if success)
+        const res = await fetch('/verify-otp', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({ email, otp }),
+          redirect: 'follow'
+        });
+        // If the request redirected to /chat, browser won't navigate automatically when using fetch.
+        // So instead navigate to chatbot page on success.
+        if(res.status === 303 || res.ok){
+          window.location.href = "/static/chatbot.html";
+        } else {
+          const j = await res.json();
+          msg.textContent = j.error || "OTP verification failed";
+        }
+      }catch(e){
+        msg.textContent = "Error verifying OTP.";
+      }
+    });
+  </script>
+</body>
+</html>
